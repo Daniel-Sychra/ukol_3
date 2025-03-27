@@ -16,14 +16,9 @@ Vydané obálky
 Platné hlasy
 Hlasy pro jednotlivé politické strany (každá strana v samostatném sloupci)
 
-Požadavky
-
+Požadavky:
 Python 3.6+
-
 Knihovny (automaticky nainstalovány z requirements.txt):
-
 requests
-
 beautifulsoup4
-
 pandas
