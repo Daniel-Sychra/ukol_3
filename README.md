@@ -20,6 +20,9 @@ Výstupní CSV soubor obsahuje následující data:
 
 Python 3.6+
 Knihovny (automaticky nainstalovány z requirements.txt):
+
 requests
+
 beautifulsoup4
+
 pandas
