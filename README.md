@@ -6,14 +6,6 @@ Python skript pro stahování výsledků parlamentních voleb 2017 z oficiální
 "URL_územního_celku" a "výstupní_soubor.csv"
 
 # Program generuje CSV soubor s následující strukturou:
-Kód obce
-Název obce
-Voliči v seznamu
-Vydané obálky
-Platné hlasy
-Hlasy pro jednotlivé politické strany (každá strana v samostatném sloupci)
-
-# Ukázka výstupu
 
 Výstupní CSV soubor obsahuje následující data:
 
