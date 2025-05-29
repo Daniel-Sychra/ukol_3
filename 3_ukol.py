@@ -1,4 +1,6 @@
+
 """
+Election Results Scraper 
 
 Tento skript stahuje volební výsledky z volby.cz pro zadaný územní celek.
 """
@@ -9,13 +11,11 @@ from bs4 import BeautifulSoup
 import csv
 import time
 
-# Hlavičky pro simulaci webového prohlížeče
 HEADERS = {
     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
 }
 
 def validate_arguments():
-    """Ověří správnost vstupních argumentů"""
     if len(sys.argv) != 3:
         print("Chyba: Zadejte prosím 2 argumenty - URL a název výstupního souboru.")
         print("Příklad: python script.py 'https://example.com' 'vysledky.csv'")
@@ -29,36 +29,43 @@ def validate_arguments():
     return url, sys.argv[2]
 
 def get_municipalities_links(main_url):
-    """Získá seznam obcí a odkazů na jejich výsledky"""
+    """Získá seznam všech obcí včetně těch v dalších sloupcích"""
     try:
         response = requests.get(main_url, headers=HEADERS)
         response.raise_for_status()
         soup = BeautifulSoup(response.text, 'html.parser')
         
         municipalities = []
-        table = soup.find('table', {'class': 'table'})
+        tables = soup.find_all('table', {'class': 'table'})
         
-        if not table:
+        if not tables:
             print("Chyba: Nepodařilo se najít tabulku s obcemi.")
             return []
         
-        rows = table.find_all('tr')[2:]  # První 2 řádky jsou hlavička
-        
-        for row in rows:
-            cols = row.find_all('td')
-            if len(cols) >= 3:
-                code = cols[0].text.strip()
-                name = cols[1].text.strip()
+        # Projdeme všechny tabulky (pro případ více tabulek na stránce)
+        for table in tables:
+            rows = table.find_all('tr')[2:]  # První 2 řádky jsou hlavička
+            
+            for row in rows:
+                cols = row.find_all('td')
                 
-                # Najdeme první dostupný odkaz
-                link = cols[0].find('a') or cols[2].find('a')
-                if link and link.has_attr('href'):
-                    full_link = f"https://www.volby.cz/pls/ps2017nss/{link['href']}"
-                    municipalities.append({
-                        'code': code,
-                        'name': name,
-                        'link': full_link
-                    })
+                # Projdeme všechny buňky v řádku
+                for i in range(0, len(cols), 3):  # Každá obec je ve 3 sloupcích (číslo, název, výběr)
+                    if i+1 >= len(cols):
+                        continue
+                    
+                    code = cols[i].text.strip()
+                    name = cols[i+1].text.strip()
+                    
+                    # Najdeme odkaz v buňce
+                    link = cols[i].find('a') or cols[i+2].find('a') if i+2 < len(cols) else None
+                    if link and link.has_attr('href'):
+                        full_link = f"https://www.volby.cz/pls/ps2017nss/{link['href']}"
+                        municipalities.append({
+                            'code': code,
+                            'name': name,
+                            'link': full_link
+                        })
         
         return municipalities
     
@@ -74,9 +81,9 @@ def scrape_municipality_data(municipality):
         soup = BeautifulSoup(response.text, 'html.parser')
         
         # Hledání základních údajů
-        voters = soup.find('td', headers='sa2').text.replace('\xa0', ' ')
-        envelopes = soup.find('td', headers='sa3').text.replace('\xa0', ' ')
-        valid = soup.find('td', headers='sa6').text.replace('\xa0', ' ')
+        voters = soup.find('td', headers='sa2').text.replace('\xa0', ' ') if soup.find('td', headers='sa2') else 'N/A'
+        envelopes = soup.find('td', headers='sa3').text.replace('\xa0', ' ') if soup.find('td', headers='sa3') else 'N/A'
+        valid = soup.find('td', headers='sa6').text.replace('\xa0', ' ') if soup.find('td', headers='sa6') else 'N/A'
         
         # Hledání výsledků stran
         parties_table = soup.find('table', {'id': 'inner'})
@@ -128,7 +135,6 @@ def write_to_csv(data, filename):
         print(f"Chyba při ukládání do CSV: {e}")
 
 def main():
-    """Hlavní funkce pro řízení scrapování"""
     url, output_file = validate_arguments()
     
     print(f"Stahuji data z: {url}")
@@ -147,6 +153,7 @@ def main():
         if data:
             all_data.append(data)
         time.sleep(0.5)  # Pauza mezi požadavky
+        sys.stdout.flush()
     
     if all_data:
         write_to_csv(all_data, output_file)
