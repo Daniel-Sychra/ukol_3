@@ -1,7 +1,7 @@
 """
 main.py: třetí projekt do Engeto Online Python Akademie
-author: Petr Svetr
-email: petr.svetr@gmail.com
+author: Daniel Sychra
+email: daniel.sychra@gmail.com
 """
 
 import sys
