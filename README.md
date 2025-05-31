@@ -6,18 +6,23 @@ Skript pro stahování výsledků parlamentních voleb 2017 z volby.cz
 
 1. **Vytvoření virtuálního prostředí** (doporučeno):
 python -m venv venv
+
 venv\Scripts\activate.bat # Windows
+
 source venv/bin/activate # Linux/Mac
 
 2. **Instalace závislostí**:
+
 pip install -r requirements.txt
 
 ## Použití
 
 **Syntax spuštění**:
+
 python main.py <URL> <VÝSTUPNÍ_SOUBOR>
 
 **Příklad**:
+
 python main.py "https://https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
 
 **Požadovaný formát URL**:
