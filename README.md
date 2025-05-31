@@ -5,6 +5,7 @@ Skript pro stahování výsledků parlamentních voleb 2017 z volby.cz
 ## Instalace
 
 1. **Vytvoření virtuálního prostředí** (doporučeno):
+
 python -m venv venv
 
 venv\Scripts\activate.bat # Windows
