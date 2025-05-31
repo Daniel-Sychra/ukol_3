@@ -1,164 +1,116 @@
-
 """
-Election Results Scraper 
-
-Tento skript stahuje volební výsledky z volby.cz pro zadaný územní celek.
+main.py: třetí projekt do Engeto Online Python Akademie
+author: Petr Svetr
+email: petr.svetr@gmail.com
 """
 
 import sys
 import requests
-from bs4 import BeautifulSoup
 import csv
-import time
+from typing import List, Tuple, Dict
+from bs4 import BeautifulSoup, Tag
 
-HEADERS = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
-}
-
-def validate_arguments():
+def check_arguments() -> None:
+    """Kontrola správného počtu a formátu vstupních argumentů"""
     if len(sys.argv) != 3:
-        print("Chyba: Zadejte prosím 2 argumenty - URL a název výstupního souboru.")
-        print("Příklad: python script.py 'https://example.com' 'vysledky.csv'")
+        print("Chyba: Zadejte právě dva argumenty - URL a výstupní soubor")
+        print("Příklad použití: python main.py 'https://www.volby.cz/...' 'vysledky.csv'")
         sys.exit(1)
-    
-    url = sys.argv[1]
-    if not url.startswith('https://www.volby.cz/pls/ps2017nss/'):
-        print("Chyba: Neplatná URL. Zadejte platnou URL volebních výsledků z volby.cz.")
+        
+    if not sys.argv[1].startswith('https://www.volby.cz/pls/ps2017nss/'):
+        print("Chyba: Neplatný formát URL. Musí začínat 'https://www.volby.cz/pls/ps2017nss/'")
         sys.exit(1)
-    
-    return url, sys.argv[2]
 
-def get_municipalities_links(main_url):
-    """Získá seznam všech obcí včetně těch v dalších sloupcích"""
+def fetch_page(url: str) -> BeautifulSoup:
+    """Stažení a parsování HTML stránky"""
     try:
-        response = requests.get(main_url, headers=HEADERS)
+        response = requests.get(url)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        municipalities = []
-        tables = soup.find_all('table', {'class': 'table'})
-        
-        if not tables:
-            print("Chyba: Nepodařilo se najít tabulku s obcemi.")
-            return []
-        
-        # Projdeme všechny tabulky (pro případ více tabulek na stránce)
-        for table in tables:
-            rows = table.find_all('tr')[2:]  # První 2 řádky jsou hlavička
-            
-            for row in rows:
-                cols = row.find_all('td')
-                
-                # Projdeme všechny buňky v řádku
-                for i in range(0, len(cols), 3):  # Každá obec je ve 3 sloupcích (číslo, název, výběr)
-                    if i+1 >= len(cols):
-                        continue
-                    
-                    code = cols[i].text.strip()
-                    name = cols[i+1].text.strip()
-                    
-                    # Najdeme odkaz v buňce
-                    link = cols[i].find('a') or cols[i+2].find('a') if i+2 < len(cols) else None
-                    if link and link.has_attr('href'):
-                        full_link = f"https://www.volby.cz/pls/ps2017nss/{link['href']}"
-                        municipalities.append({
-                            'code': code,
-                            'name': name,
-                            'link': full_link
-                        })
-        
-        return municipalities
-    
-    except Exception as e:
-        print(f"Chyba při získávání seznamu obcí: {e}")
-        return []
+        return BeautifulSoup(response.text, 'html.parser')
+    except requests.RequestException as e:
+        print(f"Chyba při načítání stránky: {e}")
+        sys.exit(1)
 
-def scrape_municipality_data(municipality):
-    """Získá volební výsledky pro jednu obec"""
-    try:
-        response = requests.get(municipality['link'], headers=HEADERS)
-        response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Hledání základních údajů
-        voters = soup.find('td', headers='sa2').text.replace('\xa0', ' ') if soup.find('td', headers='sa2') else 'N/A'
-        envelopes = soup.find('td', headers='sa3').text.replace('\xa0', ' ') if soup.find('td', headers='sa3') else 'N/A'
-        valid = soup.find('td', headers='sa6').text.replace('\xa0', ' ') if soup.find('td', headers='sa6') else 'N/A'
-        
-        # Hledání výsledků stran
-        parties_table = soup.find('table', {'id': 'inner'})
-        parties_data = {}
-        
-        if parties_table:
-            for row in parties_table.find_all('tr')[2:]:  # Přeskočení hlavičky
-                cols = row.find_all('td')
-                if len(cols) >= 3:
-                    party_name = cols[1].text.strip()
-                    votes = cols[2].text.replace('\xa0', ' ').strip()
-                    parties_data[party_name] = votes
-        
-        return {
-            'code': municipality['code'],
-            'name': municipality['name'],
-            'voters': voters,
-            'envelopes': envelopes,
-            'valid': valid,
-            **parties_data
-        }
+def extract_municipality_links(soup: BeautifulSoup) -> List[Tuple[str, str, str]]:
+    """
+    Extrakce odkazů na výsledky obcí ze všech tabulek
+    Vrací seznam n-tic (kód, název, relativní URL)
+    """
+    municipalities = []
     
-    except Exception as e:
-        print(f"Chyba při zpracování obce {municipality['name']}: {e}")
-        return None
+    for table in soup.find_all('table', {'class': 'table'}):
+        for row in table.find_all('tr')[2:]:  # Přeskočení hlavičkových řádků
+            cols = row.find_all('td')
+            if len(cols) >= 3 and cols[0].find('a'):
+                code = cols[0].get_text(strip=True)
+                name = cols[1].get_text(strip=True)
+                link = cols[0].find('a')['href']
+                municipalities.append((code, name, link))
+    
+    return municipalities
 
-def write_to_csv(data, filename):
-    """Uloží data do CSV souboru"""
-    if not data:
-        print("Chyba: Žádná data k uložení.")
-        return
-    
-    # Získání všech názvů stran pro hlavičku
-    all_parties = set()
-    for item in data:
-        all_parties.update(item.keys())
-    
-    standard_fields = ['code', 'name', 'voters', 'envelopes', 'valid']
-    party_fields = sorted([p for p in all_parties if p not in standard_fields])
-    fieldnames = standard_fields + party_fields
-    
-    try:
-        with open(filename, 'w', newline='', encoding='utf-8') as csvfile:
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(data)
-        print(f"Data úspěšně uložena do souboru {filename}")
-    except Exception as e:
-        print(f"Chyba při ukládání do CSV: {e}")
+def extract_basic_stats(soup: BeautifulSoup) -> Tuple[str, str, str]:
+    """Extrakce základních statistických údajů z detailní stránky"""
+    return (
+        soup.find('td', {'headers': 'sa2'}).get_text().replace('\xa0', ''),
+        soup.find('td', {'headers': 'sa3'}).get_text().replace('\xa0', ''),
+        soup.find('td', {'headers': 'sa6'}).get_text().replace('\xa0', '')
+    )
 
-def main():
-    url, output_file = validate_arguments()
+def extract_party_votes(soup: BeautifulSoup) -> Dict[str, str]:
+    """Extrakce výsledků politických stran z výsledkové tabulky"""
+    votes = {}
+    results_table = soup.find('table', {'id': 'ps311_t1'})
     
-    print(f"Stahuji data z: {url}")
-    municipalities = get_municipalities_links(url)
+    for row in results_table.find_all('tr')[2:]:  # Přeskočení hlavičky
+        cells = row.find_all('td')
+        if len(cells) >= 3:
+            party = cells[1].get_text(strip=True)
+            votes[party] = cells[2].get_text().replace('\xa0', '')
+    
+    return votes
+
+def process_municipality(base_url: str, code: str, name: str, link: str) -> tuple:
+    """Zpracování jednoho záznamu obce a získání všech relevantních dat"""
+    full_url = f"{base_url}/{link}"
+    soup = fetch_page(full_url)
+    
+    voters, envelopes, valid = extract_basic_stats(soup)
+    party_votes = extract_party_votes(soup)
+    
+    return (code, name, voters, envelopes, valid, *party_votes.values())
+
+def write_results(filename: str, data: List[tuple], parties: List[str]) -> None:
+    """Uložení výsledků do CSV souboru s hlavičkou"""
+    with open(filename, 'w', newline='', encoding='utf-8') as f:
+        writer = csv.writer(f)
+        writer.writerow(['Kód', 'Obec', 'Voliči', 'Obálky', 'Platné hlasy', *parties])
+        writer.writerows(data)
+
+def main() -> None:
+    check_arguments()
+    base_url = sys.argv[1].split('?')[0]
+    
+    # Získání seznamu všech obcí
+    main_page = fetch_page(sys.argv[1])
+    municipalities = extract_municipality_links(main_page)
     
     if not municipalities:
-        print("Chyba: Nebyly nalezeny žádné obce.")
+        print("Nebyly nalezeny žádné výsledky pro zadané URL")
         sys.exit(1)
     
-    print(f"Nalezeno {len(municipalities)} obcí. Zahajuji stahování...")
+    # Získání seznamu stran z první obce
+    sample_data = process_municipality(base_url, *municipalities[0])
+    parties = list(extract_party_votes(fetch_page(f"{base_url}/{municipalities[0][2]}")).keys())
     
-    all_data = []
-    for i, mun in enumerate(municipalities, 1):
-        print(f"Zpracovávám {i}/{len(municipalities)}: {mun['name']}...", end='\r')
-        data = scrape_municipality_data(mun)
-        if data:
-            all_data.append(data)
-        time.sleep(0.5)  # Pauza mezi požadavky
-        sys.stdout.flush()
+    # Zpracování všech obcí
+    results = []
+    for idx, (code, name, link) in enumerate(municipalities, 1):
+        print(f"Zpracovávám: {idx:3}/{len(municipalities)} | {name}")
+        results.append(process_municipality(base_url, code, name, link))
     
-    if all_data:
-        write_to_csv(all_data, output_file)
-    else:
-        print("\nChyba: Nepodařilo se získat žádná data.")
+    write_results(sys.argv[2], results, parties)
+    print(f"Úspěšně uloženo do {sys.argv[2]}\nCelkem záznamů: {len(results)}")
 
 if __name__ == "__main__":
     main()
