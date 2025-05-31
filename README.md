@@ -16,6 +16,7 @@ pip install -r requirements.txt
 
 **Syntax spuštění**:
 python main.py <URL> <VÝSTUPNÍ_SOUBOR>
+
 **Příklad**:
 python main.py "https://https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
 
