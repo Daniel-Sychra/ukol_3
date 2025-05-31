@@ -12,7 +12,7 @@ venv\Scripts\activate.bat # Windows
 
 source venv/bin/activate # Linux/Mac
 
-2. **Instalace závislostí**:
+2. **Instalace requirements**:
 
 pip install -r requirements.txt
 
