@@ -1,28 +1,45 @@
-# Volební výsledky - Web Scraper
+# Election Scraper 2017
 
-Python skript pro stahování výsledků parlamentních voleb 2017 z oficiálních stránek volby.cz.
+Skript pro stahování výsledků parlamentních voleb 2017 z volby.cz
 
-# Skript vyžaduje 2 povinné argumenty:
-"URL_územního_celku" a "výstupní_soubor.csv"
+## Instalace
 
-# Program generuje CSV soubor s následující strukturou:
+1. **Vytvoření virtuálního prostředí** (doporučeno):
+python -m venv venv
+venv\Scripts\activate.bat # Windows
+source venv/bin/activate # Linux/Mac
 
-Výstupní CSV soubor obsahuje následující data:
+2. **Instalace závislostí**:
+pip install -r requirements.txt
 
-| kód_obce | název_obce       | voliči | obálky | platné hlasy | ANO | ODS | SPD | Piráti | STAN | KDU-ČSL | TOP 09 |
-|----------|------------------|--------|--------|--------------|-----|-----|-----|--------|------|---------|--------|
-| 589268   | Prostějov        | 15234  | 9876   | 9654         | 3245| 1876| 987 | 654    | 321  | 543     | 210    |
-| 589276   | Kostelec na Hané | 4231   | 3210   | 3154         | 987 | 654 | 321 | 210    | 98   | 154     | 87     |
-| 589284   | Drahany          | 857    | 643    | 621          | 210 | 87  | 65  | 43     | 21   | 54      | 32     |
+## Použití
+
+**Syntax spuštění**:
+python main.py <URL> <VÝSTUPNÍ_SOUBOR>
+**Příklad**:
+python main.py "https://https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
+
+**Požadovaný formát URL**:
+- Musí obsahovat kompletní parametrizovaný odkaz z volby.cz
+- Příklad platného URL:  
+  "https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107"
+
+## Výstup
+
+Soubor CSV s následující strukturou:
+- Kód obce
+- Název obce
+- Voliči v seznamu
+- Vydané obálky
+- Platné hlasy
+- Počty hlasů pro jednotlivé strany (sloupce se dynamicky přizpůsobí)
+
+**Ukázka zápisu v CSV formátu**:
+Výstupní soubor ve formátu CSV obsahuje následující sloupce:
+kód_obce,název_obce,voliči,obálky,platné hlasy,ANO 2011,ODS,SPD,Piráti,STAN,KDU-ČSL,TOP 09
+535427,Bakov nad Jizerou,3571,2391,2375,748,344,267,224,224,76,71
+535443,Bělá pod Bezdězem,3370,2229,2213,601,264,265,199,194,66,61
+535451,Benátky nad Jizerou,5885,3800,3776,1203,510,393,372,291,138,113
 
 
-# Požadavky
 
-Python 3.6+
-Knihovny (automaticky nainstalovány z requirements.txt):
-
-requests
-
-beautifulsoup4
-
-pandas
