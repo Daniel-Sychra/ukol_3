@@ -24,7 +24,7 @@ python main.py <URL> <VÝSTUPNÍ_SOUBOR>
 
 **Příklad**:
 
-python main.py "https://https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
+python main.py "https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
 
 **Požadovaný formát URL**:
 - Musí obsahovat kompletní parametrizovaný odkaz z volby.cz
