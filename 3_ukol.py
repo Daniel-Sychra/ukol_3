@@ -4,103 +4,142 @@ author: Daniel Sychra
 email: daniel.sychra@gmail.com
 """
 
+import sys
 import requests
-from bs4 import BeautifulSoup
 import csv
-import time
 
-def nacti_parametry_z_csv(cesta_souboru):
+from bs4 import BeautifulSoup
+
+
+def scraper():
     """
-    Načte parametry z CSV souboru s očekávanou strukturou:
-    nazev_obce,kraj,obec_kod,xnumnuts
+
+    Ukázka: #  python3 scraper.py "https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
+    :return:
     """
-    obce = []
-    with open(cesta_souboru, newline='', encoding='utf-8') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            obce.append({
-                'nazev': row['nazev_obce'],
-                'kraj': row['kraj'],
-                'obec_kod': row['obec_kod'],
-                'vyber': row['xnumnuts']
-            })
-    return obce
+    if len(sys.argv) != 3:
+        print("Nebyly zadány všechny potřebné parametry.\nUkončuji program.")
+        print("Prosím přečtěte si přiloženou dokumentaci a akci opakujte.")
+        sys.exit(1)
 
-def vytvor_spravne_url(obec):
-    """Vytvoří platnou URL adresu pro danou obec"""
-    base_url = 'https://www.volby.cz/pls/ps2017nss/ps32'
-    return (f"{base_url}?xjazyk=CZ&xkraj={obec['kraj']}"
-            f"&xobec={obec['obec_kod']}&xvyber={obec['vyber']}")
+    web_page = sys.argv[1]
+    name_file = sys.argv[2]
 
-def ziskej_html(url):
-    """Získá HTML obsah s ošetřením chyb a hlavičkami"""
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-    }
-    
-    try:
-        response = requests.get(url, headers=headers, timeout=15)
-        response.raise_for_status()
-        return response.text
-    except requests.exceptions.RequestException as e:
-        print(f"Chyba při stahování {url}: {str(e)}")
-        return None
+    print(f"STAHUJI DATA Z VYBRANÉHO CÍLE: {sys.argv[1]}")
 
-def zpracuj_data(html, obec_info):
-    """Zpracuje HTML a extrahuje požadovaná data"""
-    soup = BeautifulSoup(html, 'html.parser')
-    
-    # Získání základních informací
-    data = {
-        'Obec': obec_info['nazev'],
-        'Voliči': soup.find('td', {'headers': 'sa2'}).text.replace('\xa0', ''),
-        'Vydané obálky': soup.find('td', {'headers': 'sa3'}).text.replace('\xa0', ''),
-        'Platné hlasy': soup.find('td', {'headers': 'sa6'}).text.replace('\xa0', '')
-    }
-    
-    # Získání výsledků stran
-    for row in soup.select('table.tableres ttr_header + tr'):
-        cells = row.find_all('td')
-        if len(cells) >= 3:
-            nazev_strany = cells[1].text
-            hlasy = cells[2].text.replace('\xa0', '')
-            data[nazev_strany] = hlasy
-    
-    return data
+    soup = bs_soup(web_page)
+    city_code_numbers_new = city_code_numbers(soup)
+    city_names_new = city_names(soup)
+    city_links = city_urls(soup)
+    scraped_city_data, parties_all = city_scraper(city_links, city_code_numbers_new, city_names_new)
+    header = header_maker(parties_all)
+    output_to_csv(scraped_city_data, header, name_file)
 
-def main():
-    # Konfigurace
-    vstupni_soubor = 'obce.csv'
-    vystupni_soubor = 'vysledky.csv'
-    zpozdeni = 3  # Sekundy mezi requesty
-    
-    # Načtení dat
-    obce = nacti_parametry_z_csv(vstupni_soubor)
-    
-    # Zpracování každé obce
-    with open(vystupni_soubor, 'w', newline='', encoding='utf-8') as csvfile:
-        writer = None
-        
-        for obec in obce:
-            url = vytvor_spravne_url(obec)
-            print(f"Zpracovávám: {obec['nazev']} ({url})")
-            
-            html = ziskej_html(url)
-            if not html:
+
+def bs_soup(web_page):
+    req = requests.get(web_page)
+
+    if req.status_code == 200:
+        soup = BeautifulSoup(req.content, "html.parser")
+        return soup
+
+
+def city_urls(soup):
+    """Since other locations can have other links, we have to generate complete links for all possibilities."""
+    city_urls = []
+    tables = soup.find_all("td", class_="cislo")
+    for table in tables:
+        link = table.find("a")
+        url = link["href"]
+        city_urls.append(url)
+
+    return city_urls
+
+
+def city_code_numbers(soup) -> list[int]:
+    """Vytvoří list s kódy jednotlivých obcí"""
+    city_numbers = soup.find_all("td", class_="cislo")
+    city_code_numbers_new = [int(number.getText(strip=True)) for number in city_numbers]
+    return city_code_numbers_new
+
+
+def city_names(soup) -> list[str]:
+    """Vytvoř list se jmény jednotlivých obcí."""
+    names = soup.find_all("td", class_="overflow_name")
+    city_names_new = [name.get_text(strip=True) for name in names]
+    return city_names_new
+
+
+def city_scraper(city_links, city_code_numbers_new,
+                 city_names_new) -> 'tuple[list[dict[str | str, str | list[str] | str]], list[str]]':
+    """funkce stáhne data pro každý okrsek. Tato data přidá postupně do slovníku. Pokračuje dalším odkazem.
+     Po vyčerpání všech okrsků vrátí tento slovník."""
+    print("Stahuji data z jednotlivých obcí...")
+    scraped_city_data = []
+
+    for index, link in enumerate(city_links):
+        city_part_scraper = requests.get(
+            f"https://volby.cz/pls/ps2017nss/{link}")
+
+        city_part_soup: BeautifulSoup = BeautifulSoup(city_part_scraper.content, "html.parser")
+
+        city_name = city_names_new[index]
+        number = city_code_numbers_new[index]
+
+        registered = city_part_soup.find("td").find_next().find_next().find_next().get_text()
+        envelopes = city_part_soup.find(
+            "td", class_="cislo").find_next().find_next().find_next().find_next().get_text()
+        valid = city_part_soup.find(
+            "td",
+            class_="cislo").find_next_sibling().find_next().find_next().find_next().find_next().find_next().find_next().get_text()
+
+        voices_data = city_part_soup.select("td:nth-child(3)")
+        voices_parties = [voice.getText(strip=True) for voice in voices_data[1:]]
+
+        parties_data = city_part_soup.find_all("td", class_="overflow_name")
+        parties_all = ([party.getText(strip=True) for party in parties_data])
+
+        elect_parties_with_voices = dict()
+
+        for i, name in enumerate(parties_all):
+            elect_parties_with_voices[name] = voices_parties[i]
+
+        data_city = {
+            'codes': number,
+            'location': city_name,
+            'registered': registered,
+            'envelopes': envelopes,
+            'valid': valid
+        }
+        for key, value in elect_parties_with_voices.items():
+            data_city[key] = value
+
+        scraped_city_data.append(data_city)
+
+    return scraped_city_data, parties_all
+
+
+def header_maker(parties_all) -> list[str]:
+    """Funkce iteruje seznamem jednotlivých volebních stran a přidává je do listu jako budoucí hlavičku"""
+    header = ["codes", "location", "registered", "envelopes", "valid"]
+    for party in parties_all:
+        header.append(party)
+    return header
+
+
+def output_to_csv(scraped_city_data, header, name_file) -> csv:
+    """zapisuje získaná data do souboru se jménem uvedeném ve spouštěcím argumentu scriptu scrapera"""
+    print("Zapisuji do souboru:", name_file)
+    with open(name_file, mode="w", newline="", encoding="utf-8") as output:
+        writer = csv.DictWriter(output, fieldnames=header, dialect="excel")
+        writer.writeheader()
+        for city in scraped_city_data:
+            if city == 0:
                 continue
-            
-            data = zpracuj_data(html, obec)
-            
-            # Inicializace CSV writeru s hlavičkou
-            if not writer:
-                hlavicka = list(data.keys())
-                writer = csv.DictWriter(csvfile, fieldnames=hlavicka)
-                writer.writeheader()
-            
-            writer.writerow(data)
-            
-            time.sleep(zpozdeni)
+            else:
+                writer.writerow(city)
+    print("HOTOVO, ukončuji election scraper.")
+
 
 if __name__ == "__main__":
-    main()
+    scraper()
