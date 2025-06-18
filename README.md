@@ -20,7 +20,7 @@ pip install -r requirements.txt
 
 **Syntax spuštění**:
 
-python 3_ukol <URL> <VÝSTUPNÍ_SOUBOR>
+python 3_ukol<URL><VÝSTUPNÍ_SOUBOR>
 
 **Příklad**:
 
