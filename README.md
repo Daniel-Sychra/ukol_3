@@ -18,13 +18,10 @@ pip install -r requirements.txt
 
 ## Použití
 
-**Syntax spuštění**:
 
-python 3_ukol<https://www....> <VÝSTUPNÍ_SOUBOR>
+**Příklad spuštění**:
 
-**Příklad**:
-
-python main.py "https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
+python 3_ukol.py "https://www.volby.cz/pls/ps2017nss/ps32?xjazyk=CZ&xkraj=2&xnumnuts=2107" "vysledky_mlada_boleslav.csv"
 
 **Požadovaný formát URL**:
 - Musí obsahovat kompletní parametrizovaný odkaz z volby.cz
